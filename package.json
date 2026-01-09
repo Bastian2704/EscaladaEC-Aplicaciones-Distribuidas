@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"start": "node -r dotenv/config build/index.js",
+		"start": "node build/index.js",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -70,5 +70,8 @@
 		"onlyBuiltDependencies": [
 			"esbuild"
 		]
+	},
+	"engines": {
+  		"node": "20.x"
 	}
 }

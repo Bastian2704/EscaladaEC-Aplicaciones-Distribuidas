@@ -10,17 +10,11 @@ import * as qs from 'node:querystring';
  * @param {boolean} [loose] Allow open-ended matching. Ignored with `RegExp` input.
  */
 function parse$1(input, loose) {
-	if (input instanceof RegExp) return { keys: false, pattern: input };
-	var c,
-		o,
-		tmp,
-		ext,
-		keys = [],
-		pattern = '',
-		arr = input.split('/');
+	if (input instanceof RegExp) return { keys:false, pattern:input };
+	var c, o, tmp, ext, keys=[], pattern='', arr = input.split('/');
 	arr[0] || arr.shift();
 
-	while ((tmp = arr.shift())) {
+	while (tmp = arr.shift()) {
 		c = tmp[0];
 		if (c === '*') {
 			keys.push(c);
@@ -28,7 +22,7 @@ function parse$1(input, loose) {
 		} else if (c === ':') {
 			o = tmp.indexOf('?', 1);
 			ext = tmp.indexOf('.', 1);
-			keys.push(tmp.substring(1, !!~o ? o : !!~ext ? ext : tmp.length));
+			keys.push( tmp.substring(1, !!~o ? o : !!~ext ? ext : tmp.length) );
 			pattern += !!~o && !~ext ? '(?:/([^/]+?))?' : '/([^/]+?)';
 			if (!!~ext) pattern += (!!~o ? '?' : '') + '\\' + tmp.substring(ext);
 		} else {
@@ -43,7 +37,7 @@ function parse$1(input, loose) {
 }
 
 const MAP = {
-	'': 0,
+	"": 0,
 	GET: 1,
 	HEAD: 2,
 	PATCH: 3,
@@ -52,7 +46,7 @@ const MAP = {
 	DELETE: 6,
 	TRACE: 7,
 	POST: 8,
-	PUT: 9
+	PUT: 9,
 };
 
 class Trouter {
@@ -87,36 +81,24 @@ class Trouter {
 
 	find(method, url) {
 		let midx = MAP[method];
-		let isHEAD = midx === 2;
-		let i = 0,
-			j = 0,
-			k,
-			tmp,
-			arr = this.routes;
-		let matches = [],
-			params = {},
-			handlers = [];
+		let isHEAD = (midx === 2);
+		let i=0, j=0, k, tmp, arr=this.routes;
+		let matches=[], params={}, handlers=[];
 		for (; i < arr.length; i++) {
 			tmp = arr[i];
-			if (tmp.midx === midx || tmp.midx === 0 || (isHEAD && tmp.midx === 1)) {
+			if (tmp.midx === midx  || tmp.midx === 0 || (isHEAD && tmp.midx===1) ) {
 				if (tmp.keys === false) {
 					matches = tmp.pattern.exec(url);
 					if (matches === null) continue;
-					if (matches.groups !== void 0) for (k in matches.groups) params[k] = matches.groups[k];
-					tmp.handlers.length > 1
-						? (handlers = handlers.concat(tmp.handlers))
-						: handlers.push(tmp.handlers[0]);
+					if (matches.groups !== void 0) for (k in matches.groups) params[k]=matches.groups[k];
+					tmp.handlers.length > 1 ? (handlers=handlers.concat(tmp.handlers)) : handlers.push(tmp.handlers[0]);
 				} else if (tmp.keys.length > 0) {
 					matches = tmp.pattern.exec(url);
 					if (matches === null) continue;
-					for (j = 0; j < tmp.keys.length; ) params[tmp.keys[j]] = matches[++j];
-					tmp.handlers.length > 1
-						? (handlers = handlers.concat(tmp.handlers))
-						: handlers.push(tmp.handlers[0]);
+					for (j=0; j < tmp.keys.length;) params[tmp.keys[j]]=matches[++j];
+					tmp.handlers.length > 1 ? (handlers=handlers.concat(tmp.handlers)) : handlers.push(tmp.handlers[0]);
 				} else if (tmp.pattern.test(url)) {
-					tmp.handlers.length > 1
-						? (handlers = handlers.concat(tmp.handlers))
-						: handlers.push(tmp.handlers[0]);
+					tmp.handlers.length > 1 ? (handlers=handlers.concat(tmp.handlers)) : handlers.push(tmp.handlers[0]);
 				}
 			} // else not a match
 		}
@@ -147,9 +129,7 @@ function parse(req) {
 	let prev = req._parsedUrl;
 	if (prev && prev.raw === raw) return prev;
 
-	let pathname = raw,
-		search = '',
-		query;
+	let pathname=raw, search='', query;
 
 	if (raw.length > 1) {
 		let idx = raw.indexOf('?', 1);
@@ -163,20 +143,20 @@ function parse(req) {
 		}
 	}
 
-	return (req._parsedUrl = { pathname, search, query, raw });
+	return req._parsedUrl = { pathname, search, query, raw };
 }
 
 function onError(err, req, res) {
 	let code = typeof err.status === 'number' && err.status;
-	code = res.statusCode = code && code >= 100 ? code : 500;
+	code = res.statusCode = (code && code >= 100 ? code : 500);
 	if (typeof err === 'string' || Buffer.isBuffer(err)) res.end(err);
 	else res.end(err.message || http.STATUS_CODES[code]);
 }
 
-const mount = (fn) => (fn instanceof Polka ? fn.attach : fn);
+const mount = fn => fn instanceof Polka ? fn.attach : fn;
 
 class Polka extends Trouter {
-	constructor(opts = {}) {
+	constructor(opts={}) {
 		super();
 		this.parse = parse;
 		this.server = opts.server;
@@ -192,8 +172,7 @@ class Polka extends Trouter {
 		} else if (typeof base === 'function' || base instanceof Polka) {
 			super.use('/', [base, ...fns].map(mount));
 		} else {
-			super.use(
-				base,
+			super.use(base,
 				(req, _, next) => {
 					if (typeof base === 'string') {
 						let len = base.length;
@@ -227,9 +206,8 @@ class Polka extends Trouter {
 	}
 
 	handler(req, res, next) {
-		let info = this.parse(req),
-			path = info.pathname;
-		let obj = this.find(req.method, (req.path = path));
+		let info = this.parse(req), path = info.pathname;
+		let obj = this.find(req.method, req.path=path);
 
 		req.url = path + info.search;
 		req.originalUrl = req.originalUrl || req.url;
@@ -239,23 +217,18 @@ class Polka extends Trouter {
 
 		if (path.length > 1 && path.indexOf('%', 1) !== -1) {
 			for (let k in req.params) {
-				try {
-					req.params[k] = decodeURIComponent(req.params[k]);
-				} catch (e) {
-					/* malform uri segment */
-				}
+				try { req.params[k] = decodeURIComponent(req.params[k]); }
+				catch (e) { /* malform uri segment */ }
 			}
 		}
 
-		let i = 0,
-			arr = obj.handlers.concat(this.onNoMatch),
-			len = arr.length;
-		let loop = async () => res.finished || (i < len && arr[i++](req, res, next));
-		(next = next || ((err) => (err ? this.onError(err, req, res, next) : loop().catch(next))))(); // init
+		let i=0, arr=obj.handlers.concat(this.onNoMatch), len=arr.length;
+		let loop = async () => res.finished || (i < len) && arr[i++](req, res, next);
+		(next = next || (err => err ? this.onError(err, req, res, next) : loop().catch(next)))(); // init
 	}
 }
 
-function polka(opts) {
+function polka (opts) {
 	return new Polka(opts);
 }
 

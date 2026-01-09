@@ -1,0 +1,1 @@
+import{f as e,a as o}from"../chunks/R8eUw0rf.js";import"../chunks/Dw5luiki.js";import{n}from"../chunks/Ckx13BoS.js";var i=e('<h1>Bienvenido a EscaladEC</h1> <p><a href="/login">Iniciar sesión</a> | <a href="/register">Registrarse</a></p>',1);function m(a){var r=i();n(2),o(a,r)}export{m as component};
