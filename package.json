@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
+		"start": "node -r dotenv/config build/index.js",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -60,6 +61,7 @@
 		"@lucia-auth/adapter-drizzle": "^1.1.0",
 		"@node-rs/argon2": "^2.0.2",
 		"argon2": "^0.44.0",
+		"dotenv": "^17.2.3",
 		"lucia": "^3.2.2",
 		"pg": "^8.16.3",
 		"postgres": "^3.4.5"
