@@ -1,24 +1,40 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
-import { env } from '$env/dynamic/private'; // <- OJO
+import { env } from '$env/dynamic/private';
 
-const DATABASE_URL = env.DATABASE_URL;
-if (!DATABASE_URL) throw new Error('DATABASE_URL is not set');
+let client;
+let db;
 
-// Detecta si es local
-const isLocal = /(?:^|@)(localhost|127\.0\.0\.1)(?::\d+)?/i.test(DATABASE_URL);
+export function getDb() {
+  if (!env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is not set');
+  }
 
-// Proveedores gestionados suelen requerir TLS
-const client = postgres(DATABASE_URL, isLocal ? {} : { ssl: 'require' });
+  if (!client) {
+    const DATABASE_URL = env.DATABASE_URL;
 
-export const db = drizzle(client, { schema });
+    const isLocal = /(?:^|@)(localhost|127\.0\.0\.1)(?::\d+)?/i.test(
+      DATABASE_URL
+    );
 
-// DEBUG temporal (borra después):
+    client = postgres(
+      DATABASE_URL,
+      isLocal ? {} : { ssl: 'require' }
+    );
 
-try {
-	const u = new URL(DATABASE_URL);
-	console.log('[DB] host:', u.hostname, 'db:', u.pathname.slice(1));
-} catch {
-	console.warn('[DB] DATABASE_URL inválido');
+    // DEBUG (puedes quitarlo luego)
+    try {
+      const u = new URL(DATABASE_URL);
+      console.log('[DB] host:', u.hostname, 'db:', u.pathname.slice(1));
+    } catch {
+      console.warn('[DB] DATABASE_URL inválido');
+    }
+  }
+
+  if (!db) {
+    db = drizzle(client, { schema });
+  }
+
+  return db;
 }
