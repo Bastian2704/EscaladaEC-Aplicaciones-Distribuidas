@@ -1,24 +1,30 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
-import { env } from '$env/dynamic/private'; // <- OJO
+import { env } from '$env/dynamic/private';
+import { building } from '$app/environment';
 
 const DATABASE_URL = env.DATABASE_URL;
-if (!DATABASE_URL) throw new Error('DATABASE_URL is not set');
 
 // Detecta si es local
-const isLocal = /(?:^|@)(localhost|127\.0\.0\.1)(?::\d+)?/i.test(DATABASE_URL);
+const isLocal =
+	!!DATABASE_URL && /(?:^|@)(localhost|127\.0\.0\.1)(?::\d+)?/i.test(DATABASE_URL);
 
-// Proveedores gestionados suelen requerir TLS
-const client = postgres(DATABASE_URL, isLocal ? {} : { ssl: 'require' });
+// Tipo correcto del DB de Drizzle
+type DB = ReturnType<typeof drizzle>;
 
-export const db = drizzle(client, { schema });
+// Declaramos db una sola vez
+let db: DB | null = null;
 
-// DEBUG temporal (borra después):
-
-try {
-	const u = new URL(DATABASE_URL);
-	console.log('[DB] host:', u.hostname, 'db:', u.pathname.slice(1));
-} catch {
-	console.warn('[DB] DATABASE_URL inválido');
+// Solo conectar en runtime (no en build)
+if (!building && DATABASE_URL) {
+	const client = postgres(DATABASE_URL, isLocal ? {} : { ssl: 'require' });
+	db = drizzle(client, { schema });
 }
+
+// Solo en runtime exigimos DATABASE_URL
+if (!building && !DATABASE_URL) {
+	throw new Error('DATABASE_URL is not set');
+}
+
+export { db };
