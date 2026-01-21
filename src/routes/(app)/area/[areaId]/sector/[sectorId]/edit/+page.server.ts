@@ -3,6 +3,8 @@ import { sector } from '$lib/server/db/schema';
 import { requireAdmin } from '$lib/server/auth/guards';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
+import { Status } from '$lib/contants/constants';
+
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -48,7 +50,7 @@ export const actions: Actions = {
 		const [item] = await db.select().from(sector).where(eq(sector.id, sectorId));
 		if (!item) throw error(404);
 
-		await db.update(sector).set({ status: 'deleted' }).where(eq(sector.id, sectorId));
+		await db.update(sector).set({ status:Status.deleted }).where(eq(sector.id, sectorId));
 		throw redirect(303, event.url.pathname);
 	}
 };

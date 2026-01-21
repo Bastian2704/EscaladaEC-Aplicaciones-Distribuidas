@@ -5,7 +5,9 @@ export const users = pgTable('users', {
 	id: uuid('id').primaryKey().defaultRandom(),
 	email: text('email').notNull().unique(),
 	username: text('username').notNull().unique(),
-	climbingLevel: text('climbingLevel'),
+	climbingLevelSport: integer('climbing_level_sport'),
+	climbingLevelNoRope: integer('climbing_level_no_rope'),
+	climbingLevelTrad: integer('climbing_level_trad'), //TODO: Add to ER diagram
 	age: text('age').notNull(),
 	role: text('role').notNull().default('user'),
 	status: text('status').notNull().default('active'),
@@ -86,6 +88,8 @@ export const climb = pgTable('climb', {
 	name: text('name').notNull(),
 	category: text('category').notNull(),
 	climbType: text('climb_type').notNull().default('sport'),
+	gradeSystem: text('grade_system').notNull(),
+	value: text('value').notNull(),
 	requiredEquipment: text('required_equipment').notNull(),
 	status: text('status').notNull().default('active'),
 	createdBy: text('created_by').notNull().default('user'), //user default
@@ -112,12 +116,32 @@ export const grade = pgTable('grade', {
 	difficultyLevel: integer('difficulty_level').notNull(),
 	likes: integer('likes').notNull().default(0),
 	status: text('status').notNull().default('active'), //TODO Needs adding in E-R diagram
-	publishedBy: text('publishedBy').notNull().default('user'), //TODO Needs adding in E-R diagram
+	publishedBy: text('published_by').notNull().default('user'), //TODO Needs adding in E-R diagram
 	createdAt: timestamp('created_at').notNull().defaultNow(), //TODO  Needs adding in E-R diagram
 	updatedBy: text('updated_by').notNull().default('user'), //Add user default,
 	updatedAt: timestamp('updated_at'), //Add Validations
 	deletedAt: timestamp('deleted_at') //Add Validations
 });
+
+//TODO ADD to ER Diagram
+
+export const climbingLevelSport = pgTable('climbing_level_sport',{
+	id: uuid('id').primaryKey().defaultRandom(),
+	scaledValue: integer('scaled_value').notNull().default(0),
+	frenchValue: text('french_value').notNull().default(''),
+	ydsValue: text('yds_value').notNull().default('')
+});
+export const climbingLevelNoRope = pgTable('climbing_level_no_rope',{
+	id: uuid('id').primaryKey().defaultRandom(),
+	scaledValue: integer('scaled_value').notNull().default(0),
+	vScale: text('vscale').notNull().default(''),
+	fontainebleau: text('fontainebleau').notNull().default('')
+});
+export const climbingLevelTrad = pgTable('climbing_level_trad',{
+	id: uuid('id').primaryKey().defaultRandom(),
+	scaledValue: integer('scaled_value').notNull().default(0),
+	british: text('british').notNull().default('')
+})
 
 /** =======================
  *  REVISION (1 Climb → 1 Revision)

@@ -50,8 +50,7 @@
 				<ul class="menu__list header-text">
 					<li><a class="menu__item" href="/dashboard">Menú Principal</a></li>
 					<li><a class="menu__item" href="/area">Áreas</a></li>
-					<!--Add Navigation to User Profile -->
-					<li><a class="menu__item" href="/area">Mi Perfil</a></li>
+					<li><a class="menu__item" href="/profile/{page.data.user.id}">Mi Perfil</a></li>
 				</ul>
 			</nav>
 		</header>
@@ -105,37 +104,36 @@
 							<td class="main__table-td">{area.latitude}</td>
 							<td class="main__table-td">{area.longitude}</td>
 							{#if page.data.role == 'admin'}
-							<td>
-								
+								<td>
 									<a href="/area/{area.id}/edit" on:click|stopPropagation>editar</a>
-							</td>
-							<td on:click|stopPropagation>
-								<!--TODO: Change CSS and not use TailWind-->
+								</td>
+								<td on:click|stopPropagation>
+									<!--TODO: Change CSS and not use TailWind-->
 
-								{#if area.status === 'active'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={area.id} />
-										<button formaction="?/suspend" class="border px-2 py-1">Suspender</button>
-									</form>
-								{:else if area.status === 'suspended'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={area.id} />
-										<button formaction="?/resume" class="border px-2 py-1">Reactivar</button>
-									</form>
-								{/if}
+									{#if area.status === 'active'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={area.id} />
+											<button formaction="?/suspend" class="border px-2 py-1">Suspender</button>
+										</form>
+									{:else if area.status === 'suspended'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={area.id} />
+											<button formaction="?/resume" class="border px-2 py-1">Reactivar</button>
+										</form>
+									{/if}
 
-								{#if area.status !== 'deleted'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={area.id} />
-										<button formaction="?/softDelete" class="border px-2 py-1">Borrar</button>
-									</form>
-								{:else}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={area.id} />
-										<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
-									</form>
-								{/if}
-							</td>
+									{#if area.status !== 'deleted'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={area.id} />
+											<button formaction="?/softDelete" class="border px-2 py-1">Borrar</button>
+										</form>
+									{:else}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={area.id} />
+											<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
+										</form>
+									{/if}
+								</td>
 							{/if}
 							<td class="main__table-td-arrow">→</td>
 						</tr>
@@ -185,8 +183,8 @@
 		<section class="footer__links">
 			<a href="/dashboard">Inicio</a>
 			<a href="/area">Áreas</a>
+			<a href="/profile/{page.data.user.id}">Mi Perfil</a>
 			<!--TODO: Add This Pages-->
-			<a href="/profile">Mi Perfil</a>
 			<a href="/contact">Contacto</a>
 		</section>
 		<p class="footer__text">

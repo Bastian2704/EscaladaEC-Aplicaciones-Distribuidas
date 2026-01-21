@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { type Status } from '$lib/contants/constants';
+	import {
+		climbGradeSystems,
+		gradeSystemsValues,
+		type Category,
+		type GradeSystems,
+		type Status
+	} from '$lib/contants/constants';
 	import logo from '$lib/assets/smallLogo.png';
 	import fullLogo from '$lib/assets/aeLogo.png';
 	import { page } from '$app/state';
@@ -37,36 +43,16 @@
 		systems?: string[];
 		gradeOptions?: Record<string, string[]>;
 	};
-	// 1) Fallbacks seguros
-	const systems = data.systems ?? []; // o  Object.keys(fallbackMap)
-	const optionsMap: Record<string, string[]> = data.gradeOptions ?? {}; // o fallbackMap
-
-	// 2) Estado base
-	let selectedSystem: string = systems[0] ?? '';
-
-	// ¡NO indexar todavía a valuesForSystem!
-	$: valuesForSystem = optionsMap[selectedSystem] ?? [];
-
-	let formGradeSystem: string = selectedSystem;
-
-	// ⬅️ Usa optional chaining: ?.[] evita el crash en SSR
-	let formValue: string = optionsMap[selectedSystem]?.[0] ?? '';
-
+	let selectedGradeSystem = '';
+	let selectedGradeSystemValue = '';
+	let gradeSystemList = climbGradeSystems[data.climbInfo[0].category as Category] ?? [];
+	let gradeSystemsValueList: string[] = [];
 	let accomplished = false;
-	let difficultyLevel: number = 5;
+	let difficultyLevel: number;
 
-	// 3) Al cambiar sistema, vuelve a tomar el primer valor de ese sistema
-	function onSystemChange() {
-		selectedSystem = formGradeSystem;
-		formValue = optionsMap[selectedSystem]?.[0] ?? '';
+	function onGradeSystemChange() {
+		gradeSystemsValueList = gradeSystemsValues[selectedGradeSystem as GradeSystems] ?? [];
 	}
-
-	// 4) Si cambia valuesForSystem y formValue queda inválido, corrígelo
-	$: if (valuesForSystem.length && !valuesForSystem.includes(formValue)) {
-		formValue = valuesForSystem[0] ?? '';
-	}
-
-	export let form: { message?: string; success?: boolean } | undefined;
 
 	let messageVisible = false;
 
@@ -75,6 +61,8 @@
 	function toggleForm() {
 		showForm = !showForm;
 	}
+	export let form: { message?: string; success?: boolean } | undefined;
+
 	$: if (form?.message) {
 		messageVisible = true;
 		setTimeout(() => {
@@ -94,8 +82,7 @@
 				<ul class="menu__list header-text">
 					<li><a class="menu__item" href="/dashboard">Menú Principal</a></li>
 					<li><a class="menu__item" href="/area">Áreas</a></li>
-					<!--Add Navigation to User Profile -->
-					<li><a class="menu__item" href="/area">Mi Perfil</a></li>
+					<li><a class="menu__item" href="/profile/{page.data.user.id}">Mi Perfil</a></li>
 				</ul>
 			</nav>
 		</header>
@@ -158,32 +145,31 @@
 							<td class="main__table-td">{grade.accomplished ? '✅' : '❌'}</td>
 							<td class="main__table-td">{grade.difficultyLevel}</td>
 							{#if page.data.role == 'admin'}
-							<td on:click|stopPropagation>
+								<td on:click|stopPropagation>
+									{#if grade.status === 'active'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={grade.id} />
+											<button formaction="?/suspend" class="border px-2 py-1">Suspender</button>
+										</form>
+									{:else if grade.status === 'suspended'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={grade.id} />
+											<button formaction="?/resume" class="border px-2 py-1">Reactivar</button>
+										</form>
+									{/if}
 
-								{#if grade.status === 'active'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={grade.id} />
-										<button formaction="?/suspend" class="border px-2 py-1">Suspender</button>
-									</form>
-								{:else if grade.status === 'suspended'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={grade.id} />
-										<button formaction="?/resume" class="border px-2 py-1">Reactivar</button>
-									</form>
-								{/if}
-
-								{#if grade.status !== 'deleted'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={grade.id} />
-										<button formaction="?/softDelete" class="border px-2 py-1">Borrar</button>
-									</form>
-								{:else}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={grade.id} />
-										<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
-									</form>
-								{/if}
-							</td>
+									{#if grade.status !== 'deleted'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={grade.id} />
+											<button formaction="?/softDelete" class="border px-2 py-1">Borrar</button>
+										</form>
+									{:else}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={grade.id} />
+											<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
+										</form>
+									{/if}
+								</td>
 							{/if}
 							<td class="main__table-td-arrow">Editar →</td>
 						</tr>
@@ -199,41 +185,35 @@
 						<select
 							id="gradeSystem"
 							name="gradeSystem"
-							bind:value={formGradeSystem}
-							on:change={onSystemChange}
+							bind:value={selectedGradeSystem}
+							on:change={onGradeSystemChange}
 							required
 							class="border px-2 py-1"
-							disabled={!systems.length}
+							disabled={!gradeSystemList.length}
 						>
-							{#each systems as sys}
-								<option value={sys}>{sys}</option>
+							<option value="" disabled selected>Selecciona un Sistema de Grados</option>
+
+							{#each gradeSystemList as gradeSystem}
+								<option value={gradeSystem}>{gradeSystem}</option>
 							{/each}
 						</select>
 					</div>
 
 					<div>
 						<label for="value" class="mb-1 block">Valor</label>
-						{#if valuesForSystem.length}
-							<select
-								id="value"
-								name="value"
-								bind:value={formValue}
-								required
-								class="border px-2 py-1"
-							>
-								{#each valuesForSystem as v}
-									<option value={v}>{v}</option>
-								{/each}
-							</select>
-						{:else}
-							<input
-								id="value"
-								name="value"
-								class="border bg-gray-100 px-2 py-1"
-								value=""
-								disabled
-							/>
-						{/if}
+						<select
+							id="value"
+							name="value"
+							bind:value={selectedGradeSystemValue}
+							required
+							class="border px-2 py-1"
+						>
+							<option value="" disabled selected>Selecciona un Grado</option>
+
+							{#each gradeSystemsValueList as gradeSystemValue}
+								<option value={gradeSystemValue}>{gradeSystemValue}</option>
+							{/each}
+						</select>
 					</div>
 
 					<div class="flex items-center gap-2">
@@ -255,11 +235,15 @@
 							required
 							class="border px-2 py-1"
 						>
+							<option value="" disabled selected>Selecciona el nivel de Dificultad Percibida</option
+							>
+
 							{#each Array.from({ length: 10 }, (_, i) => i + 1) as n}
 								<option value={n}>{n}</option>
 							{/each}
 						</select>
 					</div>
+					<input type="hidden" name="climbCategory" value={data.climbInfo[0].category} />
 
 					<button type="submit" formaction="?/createGrade" class="border px-3 py-1"
 						>Publicar Grado</button
@@ -274,8 +258,8 @@
 		<section class="footer__links">
 			<a href="/dashboard">Inicio</a>
 			<a href="/area">Áreas</a>
+			<a href="/profile/{page.data.user.id}">Mi Perfil</a>
 			<!--TODO: Add This Pages-->
-			<a href="/profile">Mi Perfil</a>
 			<a href="/contact">Contacto</a>
 		</section>
 		<p class="footer__text">

@@ -3,6 +3,7 @@ import { grade } from '$lib/server/db/schema';
 import { requireUser } from '$lib/server/auth/guards';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
+import { Status } from '$lib/contants/constants';
 import type { Actions, PageServerLoad } from './$types';
 
 function assertOwnerOrAdmin(user: { id: string; role: string }, item: { publishedBy: string }) {
@@ -59,7 +60,7 @@ export const actions: Actions = {
 
 		assertOwnerOrAdmin(u, item);
 
-		await db.update(grade).set({ status: 'deleted' }).where(eq(grade.id, gradeId));
+		await db.update(grade).set({ status: Status.deleted }).where(eq(grade.id, gradeId));
 		throw redirect(303, event.url.pathname);
 	}
 };

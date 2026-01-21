@@ -1,23 +1,33 @@
 <script lang="ts">
-	import { type Status } from '$lib/contants/constants';
+	import {
+		categories,
+		climbGradeSystems,
+		climbTypes,
+		gradeSystemsValues,
+		type Category,
+		type Status,
+		type GradeSystems
+	} from '$lib/contants/constants';
 	import logo from '$lib/assets/smallLogo.png';
 	import fullLogo from '$lib/assets/aeLogo.png';
 	import { page } from '$app/state';
 	import '$lib/styles/climb.css';
 
 	export let data: {
-		items: Array<{
+		items: {
 			id: string;
 			sectorId: string;
 			name: string;
 			category: string;
 			climbType: string;
+			gradeSystem: string;
+			value: string;
 			requiredEquipment: string;
 			status: Status;
 			createdAt: string;
 			updatedAt?: string | null;
 			deletedAt?: string | null;
-		}>;
+		}[];
 		sectorInfo: {
 			id: string;
 			areaId: string;
@@ -31,8 +41,6 @@
 		}[];
 		page: number;
 		status: string;
-		categoryGroups: string[];
-		categoryOptions: Record<string, string[]>;
 	};
 	let messageVisible = false;
 
@@ -49,25 +57,24 @@
 	}
 
 	// Form Status
-	const groups = data.categoryGroups ?? [];
-	const optionsMap = data.categoryOptions ?? {};
-
-	let selectedGroup: string = groups[0] ?? '';
-	$: typesForGroup = optionsMap[selectedGroup] ?? [];
-
-	let formCategory = selectedGroup;
-	let formClimbType = optionsMap[selectedGroup]?.[0] ?? '';
-
+	let selectedCategory = '';
+	let selectedType = '';
 	let name = '';
 	let requiredEquipment = '';
+	let climbTypeList: string[] = [];
+	let selectedGradeSystem = '';
+	let selectedGradeSystemValue = '';
+	let gradeSystemList: string[] = [];
+	let gradeSystemsValueList: string[] = [];
 
-	function onGroupChange() {
-		selectedGroup = formCategory;
-		formClimbType = optionsMap[selectedGroup]?.[0] ?? '';
+	function onCategoryChange() {
+		climbTypeList = climbTypes[selectedCategory as Category] ?? [];
+		gradeSystemList = climbGradeSystems[selectedCategory as Category] ?? [];
+		gradeSystemsValueList = [];
 	}
 
-	$: if (typesForGroup.length && !typesForGroup.includes(formClimbType)) {
-		formClimbType = typesForGroup[0] ?? '';
+	function onGradeSystemChange() {
+		gradeSystemsValueList = gradeSystemsValues[selectedGradeSystem as GradeSystems] ?? [];
 	}
 
 	export let form: { message?: string; success?: boolean } | undefined;
@@ -84,8 +91,7 @@
 				<ul class="menu__list header-text">
 					<li><a class="menu__item" href="/dashboard">Menú Principal</a></li>
 					<li><a class="menu__item" href="/area">Áreas</a></li>
-					<!--Add Navigation to User Profile -->
-					<li><a class="menu__item" href="/area">Mi Perfil</a></li>
+					<li><a class="menu__item" href="/profile/{page.data.user.id}">Mi Perfil</a></li>
 				</ul>
 			</nav>
 		</header>
@@ -130,6 +136,8 @@
 						<th class="main__table-item">Nombre</th>
 						<th class="main__table-item">Categoría</th>
 						<th class="main__table-item">Tipo de Escalada</th>
+						<th class="main__table-item">Sistema</th>
+						<th class="main__table-item">Valor</th>
 						<th class="main__table-item">Equipo Requerido</th>
 
 						<!--TODO: Verify if this is neccessary
@@ -146,38 +154,38 @@
 							<td class="main__table-td">{climb.name}</td>
 							<td class="main__table-td">{climb.category}</td>
 							<td class="main__table-td">{climb.climbType}</td>
+							<td class="main__table-td">{climb.gradeSystem}</td>
+							<td class="main__table-td">{climb.value}</td>
 							<td class="main__table-td">{climb.requiredEquipment}</td>
 							{#if page.data.role == 'admin'}
-							<td>
-								
+								<td>
 									<a href="climb/{climb.id}/edit" on:click|stopPropagation>editar</a>
-							</td>
-							<td on:click|stopPropagation>
+								</td>
+								<td on:click|stopPropagation>
+									{#if climb.status === 'active'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={climb.id} />
+											<button formaction="?/suspend" class="border px-2 py-1">Suspender</button>
+										</form>
+									{:else if climb.status === 'suspended'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={climb.id} />
+											<button formaction="?/resume" class="border px-2 py-1">Reactivar</button>
+										</form>
+									{/if}
 
-								{#if climb.status === 'active'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={climb.id} />
-										<button formaction="?/suspend" class="border px-2 py-1">Suspender</button>
-									</form>
-								{:else if climb.status === 'suspended'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={climb.id} />
-										<button formaction="?/resume" class="border px-2 py-1">Reactivar</button>
-									</form>
-								{/if}
-
-								{#if climb.status !== 'deleted'}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={climb.id} />
-										<button formaction="?/softDelete" class="border px-2 py-1">Borrar</button>
-									</form>
-								{:else}
-									<form method="POST" class="ml-2 inline">
-										<input type="hidden" name="id" value={climb.id} />
-										<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
-									</form>
-								{/if}
-							</td>
+									{#if climb.status !== 'deleted'}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={climb.id} />
+											<button formaction="?/softDelete" class="border px-2 py-1">Borrar</button>
+										</form>
+									{:else}
+										<form method="POST" class="ml-2 inline">
+											<input type="hidden" name="id" value={climb.id} />
+											<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
+										</form>
+									{/if}
+								</td>
 							{/if}
 							<td class="main__table-td-arrow">→</td>
 						</tr>
@@ -195,44 +203,74 @@
 
 					<div>
 						<label for="category" class="mb-1 block">Categoría</label>
+
 						<select
 							id="category"
 							name="category"
-							bind:value={formCategory}
-							on:change={onGroupChange}
+							bind:value={selectedCategory}
+							on:change={onCategoryChange}
 							required
 							class="border px-2 py-1"
-							disabled={!groups.length}
 						>
-							{#each groups as g}
-								<option value={g}>{g}</option>
+							<option value="" disabled selected>Selecciona categoría</option>
+
+							{#each categories as category}
+								<option value={category}>{category}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label for="climbType" class="mb-1 block">Tipo de Escalada</label>
+
+						<select
+							id="climbType"
+							name="climbType"
+							bind:value={selectedType}
+							disabled={!climbTypeList.length}
+							required
+							class="border px-2 py-1"
+						>
+							<option value="" disabled selected>Selecciona tipo</option>
+
+							{#each climbTypeList as type}
+								<option value={type}>{type}</option>
+							{/each}
+						</select>
+					</div>
+					<div>
+						<label for="gradeSystem" class="mb-1 block">Sistema de grado</label>
+						<select
+							id="gradeSystem"
+							name="gradeSystem"
+							bind:value={selectedGradeSystem}
+							on:change={onGradeSystemChange}
+							required
+							class="border px-2 py-1"
+							disabled={!gradeSystemList.length}
+						>
+							<option value="" disabled selected>Selecciona un Sistema de Grados</option>
+
+							{#each gradeSystemList as gradeSystem}
+								<option value={gradeSystem}>{gradeSystem}</option>
 							{/each}
 						</select>
 					</div>
 
 					<div>
-						<label for="climbType" class="mb-1 block">Tipo de Escalada</label>
-						{#if typesForGroup.length}
-							<select
-								id="climbType"
-								name="climbType"
-								bind:value={formClimbType}
-								required
-								class="border px-2 py-1"
-							>
-								{#each typesForGroup as t}
-									<option value={t}>{t}</option>
-								{/each}
-							</select>
-						{:else}
-							<input
-								id="climbType"
-								name="climbType"
-								value=""
-								class="border bg-gray-100 px-2 py-1"
-								disabled
-							/>
-						{/if}
+						<label for="value" class="mb-1 block">Valor</label>
+						<select
+							id="value"
+							name="value"
+							bind:value={selectedGradeSystemValue}
+							required
+							class="border px-2 py-1"
+						>
+							<option value="" disabled selected>Selecciona un Grado</option>
+
+							{#each gradeSystemsValueList as gradeSystemValue}
+								<option value={gradeSystemValue}>{gradeSystemValue}</option>
+							{/each}
+						</select>
 					</div>
 
 					<div>
@@ -259,8 +297,8 @@
 		<section class="footer__links">
 			<a href="/dashboard">Inicio</a>
 			<a href="/area">Áreas</a>
+			<a href="/profile/{page.data.user.id}">Mi Perfil</a>
 			<!--TODO: Add This Pages-->
-			<a href="/profile">Mi Perfil</a>
 			<a href="/contact">Contacto</a>
 		</section>
 		<p class="footer__text">

@@ -2,9 +2,8 @@ import { db } from '$lib/server/db';
 import { climb, sector } from '$lib/server/db/schema';
 import { requireUser, requireAdmin } from '$lib/server/auth/guards';
 import {
-	category as categoryMap,
-	isValidCategoryGroup,
-	isValidClimbType,
+	isValidCategory,
+	isValidType,
 	Status
 } from '$lib/contants/constants';
 import { fail, redirect } from '@sveltejs/kit';
@@ -12,8 +11,6 @@ import { eq } from 'drizzle-orm';
 import type { Actions, PageServerLoad } from './$types';
 
 const PAGE_SIZE = 10;
-
-//TODO Select logic
 
 export const load: PageServerLoad = async (event) => {
 	requireUser(event);
@@ -40,8 +37,6 @@ export const load: PageServerLoad = async (event) => {
 		sectorId,
 		areaId,
 		sectorInfo,
-		categoryGroups: Object.keys(categoryMap),
-		categoryOptions: categoryMap
 	};
 };
 export const actions: Actions = {
@@ -54,19 +49,21 @@ export const actions: Actions = {
 		const categoryGroup = String(data.get('category') ?? '').trim();
 		const climbType = String(data.get('climbType') ?? '').trim();
 		const requiredEquipment = String(data.get('requiredEquipment') ?? '').trim();
+		const gradeSystem = String(data.get('gradeSystem') ?? '').trim();
+		const value = String(data.get('value') ?? '').trim();
+
 
 		if (!name || !categoryGroup || !climbType || !requiredEquipment) {
 			return fail(400, {
 				message: 'Nombre del Climb, Categoria, Tipo de Escalada Y Equipo Requerido son Obligatorias'
 			});
 		}
-		if (!name || !categoryGroup || !climbType || !requiredEquipment) {
-			return fail(400, { message: 'Nombre, Categoría, Tipo y Equipo Requerido son obligatorios.' });
-		}
-		if (!isValidCategoryGroup(categoryGroup)) {
+
+		if (!isValidCategory(categoryGroup)) {
+			console.log(categoryGroup);
 			return fail(400, { message: 'Categoría inválida.' });
 		}
-		if (!isValidClimbType(categoryGroup, climbType)) {
+		if (!isValidType(categoryGroup, climbType)) {
 			return fail(400, { message: 'El tipo no corresponde a la categoría seleccionada.' });
 		}
 
@@ -76,6 +73,8 @@ export const actions: Actions = {
 			name,
 			category: categoryGroup,
 			climbType,
+			gradeSystem,
+			value,
 			requiredEquipment,
 			status: 'active',
 			createdAt: new Date(),
