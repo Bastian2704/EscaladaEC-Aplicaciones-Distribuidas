@@ -75,7 +75,7 @@
 					{:else}
 						<form method="POST" class="ml-2 inline">
 							<input type="hidden" name="id" value={u.id} />
-							<button formaction="?/restore" class="border px-2 py-1">Restaurar</button>
+							<button formaction="?/resume" class="border px-2 py-1">Restaurar</button>
 						</form>
 					{/if}
 				</td>

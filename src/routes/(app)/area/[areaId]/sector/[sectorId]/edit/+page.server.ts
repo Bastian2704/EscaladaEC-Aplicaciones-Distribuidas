@@ -1,56 +1,63 @@
-import { db } from '$lib/server/db';
-import { sector } from '$lib/server/db/schema';
-import { requireAdmin } from '$lib/server/auth/guards';
-import { error, fail, redirect } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
-import { Status } from '$lib/contants/constants';
-
 import type { Actions, PageServerLoad } from './$types';
+import { fail, redirect } from '@sveltejs/kit';
+import { requireAdmin } from '$lib/server/auth/guards';
+import { ServiceFactory } from '$lib/server/factories/serviceFactory';
+import { parseStatus } from '$lib/server/domain/parsers';
 
 export const load: PageServerLoad = async (event) => {
-	requireAdmin(event);
-	const { sectorId } = event.params;
+	const admin = requireAdmin(event);
+	const { areaId, sectorId } = event.params;
 
-	const [item] = await db.select().from(sector).where(eq(sector.id, sectorId));
-	if (!item) throw error(404);
+	const sectorService = ServiceFactory.create('sector');
+	const item = await sectorService.getSectorForEdit(sectorId, admin);
 
-	return { item, sectorId };
+	return { item, areaId, sectorId };
 };
 
 export const actions: Actions = {
 	save: async (event) => {
-		requireAdmin(event);
-
+		const admin = requireAdmin(event);
 		const { sectorId } = event.params;
-
-		const [item] = await db.select().from(sector).where(eq(sector.id, sectorId));
-		if (!item) throw error(404);
 
 		const data = await event.request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		const orientation = String(data.get('orientation') ?? '').trim();
 		const description = String(data.get('description') ?? '').trim();
-		const status = String(data.get('status') ?? '');
+		const status = parseStatus(data.get('status'), 'active');
 
-		if (!name || !orientation || !description) return fail(400, { message: 'Datos inválidos' });
+		if (!name || !orientation || !description) {
+			return fail(400, { message: 'Datos inválidos' });
+		}
 
-		await db
-			.update(sector)
-			.set({ name, orientation, description, status })
-			.where(eq(sector.id, sectorId));
+		try {
+			await ServiceFactory.create('sector').updateSector(
+				sectorId,
+				{
+					name,
+					orientation,
+					description,
+					status
+				},
+				admin
+			);
 
-		const referer = event.request.headers.get('referer');
-		throw redirect(303, referer ?? `/area/${event.params.areaId}/sector`);
+			throw redirect(303, event.url.pathname);
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Error guardando sector';
+			return fail(400, { message });
+		}
 	},
 
 	softDelete: async (event) => {
-		requireAdmin(event);
+		const admin = requireAdmin(event);
 		const { sectorId } = event.params;
 
-		const [item] = await db.select().from(sector).where(eq(sector.id, sectorId));
-		if (!item) throw error(404);
-
-		await db.update(sector).set({ status:Status.deleted }).where(eq(sector.id, sectorId));
-		throw redirect(303, event.url.pathname);
+		try {
+			await ServiceFactory.create('sector').softDelete(sectorId, admin);
+			throw redirect(303, event.url.pathname);
+		} catch (e) {
+			const message = e instanceof Error ? e.message : 'Error eliminando sector';
+			return fail(400, { message });
+		}
 	}
 };
