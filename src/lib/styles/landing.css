@@ -1,0 +1,86 @@
+/* Fondo */
+.landing-background {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100vh;
+	background: linear-gradient(135deg, #e0f2fe, #ffffff);
+	font-family: 'Inter', sans-serif;
+	text-align: center;
+}
+
+/* Contenedor principal */
+.landing-container {
+	max-width: 600px;
+	padding: 2rem;
+}
+
+/* Título */
+.landing-title {
+	font-size: 3rem;
+	font-weight: 700;
+	color: #1e293b;
+	margin-bottom: 1rem;
+}
+
+/* Subtítulo */
+.landing-subtitle {
+	font-size: 1.25rem;
+	color: #4b5563;
+	margin-bottom: 2.5rem;
+}
+
+/* Botones */
+.landing-buttons {
+	display: flex;
+	justify-content: center;
+	gap: 1.5rem;
+	flex-wrap: wrap;
+}
+
+.btn-primary, .btn-secondary {
+	padding: 0.75rem 2rem;
+	border-radius: 10px;
+	font-weight: 600;
+	font-size: 1rem;
+	text-decoration: none;
+	transition: transform 0.2s, background-color 0.2s;
+}
+
+/* Botón principal (login) */
+.btn-primary {
+	background-color: #3b82f6;
+	color: white;
+	border: 1px solid #2563eb;
+}
+
+.btn-primary:hover {
+	background-color: #2563eb;
+	transform: translateY(-2px);
+}
+
+/* Botón secundario (register) */
+.btn-secondary {
+	background-color: #f9fafb;
+	color: #3b82f6;
+	border: 1px solid #3b82f6;
+}
+
+.btn-secondary:hover {
+	background-color: #e0f2fe;
+	transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+	.landing-title {
+		font-size: 2.25rem;
+	}
+	.landing-subtitle {
+		font-size: 1rem;
+	}
+	.landing-buttons {
+		flex-direction: column;
+		gap: 1rem;
+	}
+}

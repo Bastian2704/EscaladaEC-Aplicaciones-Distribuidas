@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) {
-		throw redirect(303, '/dashboard');
+		throw redirect(303, '/area');
 	}
 
 	return {};
@@ -41,6 +41,6 @@ export const actions: Actions = {
 		const session = await lucia.createSession(u.id, {});
 		const cookie = lucia.createSessionCookie(session.id);
 		cookies.set(cookie.name, cookie.value, { ...cookie.attributes, path: '/' });
-		throw redirect(303, '/dashboard');
+		throw redirect(303, '/area');
 	}
 };
