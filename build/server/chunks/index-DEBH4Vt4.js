@@ -1,5 +1,522 @@
-import { t as to_style, c as clsx, b as to_class, a as attr } from './attributes-C7gAcNRt.js';
 import { a as set_ssr_context, b as ssr_context, p as push, c as pop, e as escape_html } from './context-R2425nfV.js';
+
+/** @type {Record<string, string>} */
+const escaped = {
+	'<': '\\u003C',
+	'\\': '\\\\',
+	'\b': '\\b',
+	'\f': '\\f',
+	'\n': '\\n',
+	'\r': '\\r',
+	'\t': '\\t',
+	'\u2028': '\\u2028',
+	'\u2029': '\\u2029'
+};
+
+class DevalueError extends Error {
+	/**
+	 * @param {string} message
+	 * @param {string[]} keys
+	 * @param {any} [value] - The value that failed to be serialized
+	 * @param {any} [root] - The root value being serialized
+	 */
+	constructor(message, keys, value, root) {
+		super(message);
+		this.name = 'DevalueError';
+		this.path = keys.join('');
+		this.value = value;
+		this.root = root;
+	}
+}
+
+/** @param {any} thing */
+function is_primitive(thing) {
+	return Object(thing) !== thing;
+}
+
+const object_proto_names = /* @__PURE__ */ Object.getOwnPropertyNames(
+	Object.prototype
+)
+	.sort()
+	.join('\0');
+
+/** @param {any} thing */
+function is_plain_object(thing) {
+	const proto = Object.getPrototypeOf(thing);
+
+	return (
+		proto === Object.prototype ||
+		proto === null ||
+		Object.getPrototypeOf(proto) === null ||
+		Object.getOwnPropertyNames(proto).sort().join('\0') === object_proto_names
+	);
+}
+
+/** @param {any} thing */
+function get_type(thing) {
+	return Object.prototype.toString.call(thing).slice(8, -1);
+}
+
+/** @param {string} char */
+function get_escaped_char(char) {
+	switch (char) {
+		case '"':
+			return '\\"';
+		case '<':
+			return '\\u003C';
+		case '\\':
+			return '\\\\';
+		case '\n':
+			return '\\n';
+		case '\r':
+			return '\\r';
+		case '\t':
+			return '\\t';
+		case '\b':
+			return '\\b';
+		case '\f':
+			return '\\f';
+		case '\u2028':
+			return '\\u2028';
+		case '\u2029':
+			return '\\u2029';
+		default:
+			return char < ' '
+				? `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+				: '';
+	}
+}
+
+/** @param {string} str */
+function stringify_string(str) {
+	let result = '';
+	let last_pos = 0;
+	const len = str.length;
+
+	for (let i = 0; i < len; i += 1) {
+		const char = str[i];
+		const replacement = get_escaped_char(char);
+		if (replacement) {
+			result += str.slice(last_pos, i) + replacement;
+			last_pos = i + 1;
+		}
+	}
+
+	return `"${last_pos === 0 ? str : result + str.slice(last_pos)}"`;
+}
+
+/** @param {Record<string | symbol, any>} object */
+function enumerable_symbols(object) {
+	return Object.getOwnPropertySymbols(object).filter(
+		(symbol) => Object.getOwnPropertyDescriptor(object, symbol).enumerable
+	);
+}
+
+const is_identifier = /^[a-zA-Z_$][a-zA-Z_$0-9]*$/;
+
+/** @param {string} key */
+function stringify_key(key) {
+	return is_identifier.test(key) ? '.' + key : '[' + JSON.stringify(key) + ']';
+}
+
+const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_$';
+const unsafe_chars = /[<\b\f\n\r\t\0\u2028\u2029]/g;
+const reserved =
+	/^(?:do|if|in|for|int|let|new|try|var|byte|case|char|else|enum|goto|long|this|void|with|await|break|catch|class|const|final|float|short|super|throw|while|yield|delete|double|export|import|native|return|switch|throws|typeof|boolean|default|extends|finally|package|private|abstract|continue|debugger|function|volatile|interface|protected|transient|implements|instanceof|synchronized)$/;
+
+/**
+ * Turn a value into the JavaScript that creates an equivalent value
+ * @param {any} value
+ * @param {(value: any, uneval: (value: any) => string) => string | void} [replacer]
+ */
+function uneval(value, replacer) {
+	const counts = new Map();
+
+	/** @type {string[]} */
+	const keys = [];
+
+	const custom = new Map();
+
+	/** @param {any} thing */
+	function walk(thing) {
+		if (!is_primitive(thing)) {
+			if (counts.has(thing)) {
+				counts.set(thing, counts.get(thing) + 1);
+				return;
+			}
+
+			counts.set(thing, 1);
+
+			if (replacer) {
+				const str = replacer(thing, (value) => uneval(value, replacer));
+
+				if (typeof str === 'string') {
+					custom.set(thing, str);
+					return;
+				}
+			}
+
+			if (typeof thing === 'function') {
+				throw new DevalueError(`Cannot stringify a function`, keys, thing, value);
+			}
+
+			const type = get_type(thing);
+
+			switch (type) {
+				case 'Number':
+				case 'BigInt':
+				case 'String':
+				case 'Boolean':
+				case 'Date':
+				case 'RegExp':
+				case 'URL':
+				case 'URLSearchParams':
+					return;
+
+				case 'Array':
+					/** @type {any[]} */ (thing).forEach((value, i) => {
+						keys.push(`[${i}]`);
+						walk(value);
+						keys.pop();
+					});
+					break;
+
+				case 'Set':
+					Array.from(thing).forEach(walk);
+					break;
+
+				case 'Map':
+					for (const [key, value] of thing) {
+						keys.push(
+							`.get(${is_primitive(key) ? stringify_primitive(key) : '...'})`
+						);
+						walk(value);
+						keys.pop();
+					}
+					break;
+
+				case 'Int8Array':
+				case 'Uint8Array':
+				case 'Uint8ClampedArray':
+				case 'Int16Array':
+				case 'Uint16Array':
+				case 'Int32Array':
+				case 'Uint32Array':
+				case 'Float32Array':
+				case 'Float64Array':
+				case 'BigInt64Array':
+				case 'BigUint64Array':
+					walk(thing.buffer);
+					return;
+
+				case 'ArrayBuffer':
+					return;
+
+				case 'Temporal.Duration':
+				case 'Temporal.Instant':
+				case 'Temporal.PlainDate':
+				case 'Temporal.PlainTime':
+				case 'Temporal.PlainDateTime':
+				case 'Temporal.PlainMonthDay':
+				case 'Temporal.PlainYearMonth':
+				case 'Temporal.ZonedDateTime':
+					return;
+
+				default:
+					if (!is_plain_object(thing)) {
+						throw new DevalueError(
+							`Cannot stringify arbitrary non-POJOs`,
+							keys,
+							thing,
+							value
+						);
+					}
+
+					if (enumerable_symbols(thing).length > 0) {
+						throw new DevalueError(
+							`Cannot stringify POJOs with symbolic keys`,
+							keys,
+							thing,
+							value
+						);
+					}
+
+					for (const key in thing) {
+						keys.push(stringify_key(key));
+						walk(thing[key]);
+						keys.pop();
+					}
+			}
+		}
+	}
+
+	walk(value);
+
+	const names = new Map();
+
+	Array.from(counts)
+		.filter((entry) => entry[1] > 1)
+		.sort((a, b) => b[1] - a[1])
+		.forEach((entry, i) => {
+			names.set(entry[0], get_name(i));
+		});
+
+	/**
+	 * @param {any} thing
+	 * @returns {string}
+	 */
+	function stringify(thing) {
+		if (names.has(thing)) {
+			return names.get(thing);
+		}
+
+		if (is_primitive(thing)) {
+			return stringify_primitive(thing);
+		}
+
+		if (custom.has(thing)) {
+			return custom.get(thing);
+		}
+
+		const type = get_type(thing);
+
+		switch (type) {
+			case 'Number':
+			case 'String':
+			case 'Boolean':
+				return `Object(${stringify(thing.valueOf())})`;
+
+			case 'RegExp':
+				return `new RegExp(${stringify_string(thing.source)}, "${
+					thing.flags
+				}")`;
+
+			case 'Date':
+				return `new Date(${thing.getTime()})`;
+
+			case 'URL':
+				return `new URL(${stringify_string(thing.toString())})`;
+
+			case 'URLSearchParams':
+				return `new URLSearchParams(${stringify_string(thing.toString())})`;
+
+			case 'Array':
+				const members = /** @type {any[]} */ (thing).map((v, i) =>
+					i in thing ? stringify(v) : ''
+				);
+				const tail = thing.length === 0 || thing.length - 1 in thing ? '' : ',';
+				return `[${members.join(',')}${tail}]`;
+
+			case 'Set':
+			case 'Map':
+				return `new ${type}([${Array.from(thing).map(stringify).join(',')}])`;
+
+			case 'Int8Array':
+			case 'Uint8Array':
+			case 'Uint8ClampedArray':
+			case 'Int16Array':
+			case 'Uint16Array':
+			case 'Int32Array':
+			case 'Uint32Array':
+			case 'Float32Array':
+			case 'Float64Array':
+			case 'BigInt64Array':
+			case 'BigUint64Array': {
+				let str = `new ${type}`;
+
+				if (counts.get(thing.buffer) === 1) {
+					const array = new thing.constructor(thing.buffer);
+					str += `([${array}])`;
+				} else {
+					str += `([${stringify(thing.buffer)}])`;
+				}
+
+				const a = thing.byteOffset;
+				const b = a + thing.byteLength;
+
+				// handle subarrays
+				if (a > 0 || b !== thing.buffer.byteLength) {
+					const m = +/(\d+)/.exec(type)[1] / 8;
+					str += `.subarray(${a / m},${b / m})`;
+				}
+
+				return str;
+			}
+
+			case 'ArrayBuffer': {
+				const ui8 = new Uint8Array(thing);
+				return `new Uint8Array([${ui8.toString()}]).buffer`;
+			}
+
+			case 'Temporal.Duration':
+			case 'Temporal.Instant':
+			case 'Temporal.PlainDate':
+			case 'Temporal.PlainTime':
+			case 'Temporal.PlainDateTime':
+			case 'Temporal.PlainMonthDay':
+			case 'Temporal.PlainYearMonth':
+			case 'Temporal.ZonedDateTime':
+				return `${type}.from(${stringify_string(thing.toString())})`;
+
+			default:
+				const keys = Object.keys(thing);
+				const obj = keys
+					.map((key) => `${safe_key(key)}:${stringify(thing[key])}`)
+					.join(',');
+				const proto = Object.getPrototypeOf(thing);
+				if (proto === null) {
+					return keys.length > 0
+						? `{${obj},__proto__:null}`
+						: `{__proto__:null}`;
+				}
+
+				return `{${obj}}`;
+		}
+	}
+
+	const str = stringify(value);
+
+	if (names.size) {
+		/** @type {string[]} */
+		const params = [];
+
+		/** @type {string[]} */
+		const statements = [];
+
+		/** @type {string[]} */
+		const values = [];
+
+		names.forEach((name, thing) => {
+			params.push(name);
+
+			if (custom.has(thing)) {
+				values.push(/** @type {string} */ (custom.get(thing)));
+				return;
+			}
+
+			if (is_primitive(thing)) {
+				values.push(stringify_primitive(thing));
+				return;
+			}
+
+			const type = get_type(thing);
+
+			switch (type) {
+				case 'Number':
+				case 'String':
+				case 'Boolean':
+					values.push(`Object(${stringify(thing.valueOf())})`);
+					break;
+
+				case 'RegExp':
+					values.push(thing.toString());
+					break;
+
+				case 'Date':
+					values.push(`new Date(${thing.getTime()})`);
+					break;
+
+				case 'Array':
+					values.push(`Array(${thing.length})`);
+					/** @type {any[]} */ (thing).forEach((v, i) => {
+						statements.push(`${name}[${i}]=${stringify(v)}`);
+					});
+					break;
+
+				case 'Set':
+					values.push(`new Set`);
+					statements.push(
+						`${name}.${Array.from(thing)
+							.map((v) => `add(${stringify(v)})`)
+							.join('.')}`
+					);
+					break;
+
+				case 'Map':
+					values.push(`new Map`);
+					statements.push(
+						`${name}.${Array.from(thing)
+							.map(([k, v]) => `set(${stringify(k)}, ${stringify(v)})`)
+							.join('.')}`
+					);
+					break;
+
+				case 'ArrayBuffer':
+					values.push(
+						`new Uint8Array([${new Uint8Array(thing).join(',')}]).buffer`
+					);
+					break;
+
+				default:
+					values.push(
+						Object.getPrototypeOf(thing) === null ? 'Object.create(null)' : '{}'
+					);
+					Object.keys(thing).forEach((key) => {
+						statements.push(
+							`${name}${safe_prop(key)}=${stringify(thing[key])}`
+						);
+					});
+			}
+		});
+
+		statements.push(`return ${str}`);
+
+		return `(function(${params.join(',')}){${statements.join(
+			';'
+		)}}(${values.join(',')}))`;
+	} else {
+		return str;
+	}
+}
+
+/** @param {number} num */
+function get_name(num) {
+	let name = '';
+
+	do {
+		name = chars[num % chars.length] + name;
+		num = ~~(num / chars.length) - 1;
+	} while (num >= 0);
+
+	return reserved.test(name) ? `${name}0` : name;
+}
+
+/** @param {string} c */
+function escape_unsafe_char(c) {
+	return escaped[c] || c;
+}
+
+/** @param {string} str */
+function escape_unsafe_chars(str) {
+	return str.replace(unsafe_chars, escape_unsafe_char);
+}
+
+/** @param {string} key */
+function safe_key(key) {
+	return /^[_$a-zA-Z][_$a-zA-Z0-9]*$/.test(key)
+		? key
+		: escape_unsafe_chars(JSON.stringify(key));
+}
+
+/** @param {string} key */
+function safe_prop(key) {
+	return /^[_$a-zA-Z][_$a-zA-Z0-9]*$/.test(key)
+		? `.${key}`
+		: `[${escape_unsafe_chars(JSON.stringify(key))}]`;
+}
+
+/** @param {any} thing */
+function stringify_primitive(thing) {
+	if (typeof thing === 'string') return stringify_string(thing);
+	if (thing === void 0) return 'void 0';
+	if (thing === 0 && 1 / thing < 0) return '-0';
+	const str = String(thing);
+	if (typeof thing === 'number') return str.replace(/^(-)?0\./, '$1.');
+	if (typeof thing === 'bigint') return thing + 'n';
+	return str;
+}
+
+function r(e){var t,f,n="";if("string"==typeof e||"number"==typeof e)n+=e;else if("object"==typeof e)if(Array.isArray(e)){var o=e.length;for(t=0;t<o;t++)e[t]&&(f=r(e[t]))&&(n&&(n+=" "),n+=f);}else for(f in e)e[f]&&(n&&(n+=" "),n+=f);return n}function clsx$1(){for(var e,t,f=0,n="",o=arguments.length;f<o;f++)(e=arguments[f])&&(t=r(e))&&(n&&(n+=" "),n+=t);return n}
 
 const DERIVED = 1 << 1;
 const EFFECT = 1 << 2;
@@ -76,6 +593,147 @@ function is_boolean_attribute(name) {
 const PASSIVE_EVENTS = ["touchstart", "touchmove"];
 function is_passive_event(name) {
   return PASSIVE_EVENTS.includes(name);
+}
+const replacements = {
+  translate: /* @__PURE__ */ new Map([
+    [true, "yes"],
+    [false, "no"]
+  ])
+};
+function attr(name, value, is_boolean = false) {
+  if (name === "hidden" && value !== "until-found") {
+    is_boolean = true;
+  }
+  if (value == null || !value && is_boolean) return "";
+  const normalized = name in replacements && replacements[name].get(value) || value;
+  const assignment = is_boolean ? "" : `="${escape_html(normalized, true)}"`;
+  return ` ${name}${assignment}`;
+}
+function clsx(value) {
+  if (typeof value === "object") {
+    return clsx$1(value);
+  } else {
+    return value ?? "";
+  }
+}
+const whitespace = [..." 	\n\r\f \v\uFEFF"];
+function to_class(value, hash, directives) {
+  var classname = value == null ? "" : "" + value;
+  if (hash) {
+    classname = classname ? classname + " " + hash : hash;
+  }
+  if (directives) {
+    for (var key in directives) {
+      if (directives[key]) {
+        classname = classname ? classname + " " + key : key;
+      } else if (classname.length) {
+        var len = key.length;
+        var a = 0;
+        while ((a = classname.indexOf(key, a)) >= 0) {
+          var b = a + len;
+          if ((a === 0 || whitespace.includes(classname[a - 1])) && (b === classname.length || whitespace.includes(classname[b]))) {
+            classname = (a === 0 ? "" : classname.substring(0, a)) + classname.substring(b + 1);
+          } else {
+            a = b;
+          }
+        }
+      }
+    }
+  }
+  return classname === "" ? null : classname;
+}
+function append_styles(styles, important = false) {
+  var separator = important ? " !important;" : ";";
+  var css = "";
+  for (var key in styles) {
+    var value = styles[key];
+    if (value != null && value !== "") {
+      css += " " + key + ": " + value + separator;
+    }
+  }
+  return css;
+}
+function to_css_name(name) {
+  if (name[0] !== "-" || name[1] !== "-") {
+    return name.toLowerCase();
+  }
+  return name;
+}
+function to_style(value, styles) {
+  if (styles) {
+    var new_style = "";
+    var normal_styles;
+    var important_styles;
+    if (Array.isArray(styles)) {
+      normal_styles = styles[0];
+      important_styles = styles[1];
+    } else {
+      normal_styles = styles;
+    }
+    if (value) {
+      value = String(value).replaceAll(/\s*\/\*.*?\*\/\s*/g, "").trim();
+      var in_str = false;
+      var in_apo = 0;
+      var in_comment = false;
+      var reserved_names = [];
+      if (normal_styles) {
+        reserved_names.push(...Object.keys(normal_styles).map(to_css_name));
+      }
+      if (important_styles) {
+        reserved_names.push(...Object.keys(important_styles).map(to_css_name));
+      }
+      var start_index = 0;
+      var name_index = -1;
+      const len = value.length;
+      for (var i = 0; i < len; i++) {
+        var c = value[i];
+        if (in_comment) {
+          if (c === "/" && value[i - 1] === "*") {
+            in_comment = false;
+          }
+        } else if (in_str) {
+          if (in_str === c) {
+            in_str = false;
+          }
+        } else if (c === "/" && value[i + 1] === "*") {
+          in_comment = true;
+        } else if (c === '"' || c === "'") {
+          in_str = c;
+        } else if (c === "(") {
+          in_apo++;
+        } else if (c === ")") {
+          in_apo--;
+        }
+        if (!in_comment && in_str === false && in_apo === 0) {
+          if (c === ":" && name_index === -1) {
+            name_index = i;
+          } else if (c === ";" || i === len - 1) {
+            if (name_index !== -1) {
+              var name = to_css_name(value.substring(start_index, name_index).trim());
+              if (!reserved_names.includes(name)) {
+                if (c !== ";") {
+                  i++;
+                }
+                var property = value.substring(start_index, i).trim();
+                new_style += " " + property + ";";
+              }
+            }
+            start_index = i + 1;
+            name_index = -1;
+          }
+        }
+      }
+    }
+    if (normal_styles) {
+      new_style += append_styles(normal_styles);
+    }
+    if (important_styles) {
+      new_style += append_styles(important_styles, true);
+    }
+    new_style = new_style.trim();
+    return new_style === "" ? null : new_style;
+  }
+  return value == null ? null : String(value);
 }
 const BLOCK_OPEN = `<!--${HYDRATION_START}-->`;
 const BLOCK_CLOSE = `<!--${HYDRATION_END}-->`;
@@ -300,16 +958,17 @@ class Renderer {
    * @param {Record<string, boolean> | undefined} [classes]
    * @param {Record<string, string> | undefined} [styles]
    * @param {number | undefined} [flags]
+   * @param {boolean | undefined} [is_rich]
    * @returns {void}
    */
-  select(attrs, fn, css_hash, classes, styles, flags) {
+  select(attrs, fn, css_hash, classes, styles, flags, is_rich) {
     const { value, ...select_attrs } = attrs;
     this.push(`<select${attributes(select_attrs, css_hash, classes, styles, flags)}>`);
     this.child((renderer) => {
       renderer.local.select_value = value;
       fn(renderer);
     });
-    this.push("</select>");
+    this.push(`${is_rich ? "<!>" : ""}</select>`);
   }
   /**
    * @param {Record<string, any>} attrs
@@ -318,8 +977,9 @@ class Renderer {
    * @param {Record<string, boolean> | undefined} [classes]
    * @param {Record<string, string> | undefined} [styles]
    * @param {number | undefined} [flags]
+   * @param {boolean | undefined} [is_rich]
    */
-  option(attrs, body, css_hash, classes, styles, flags) {
+  option(attrs, body, css_hash, classes, styles, flags, is_rich) {
     this.#out.push(`<option${attributes(attrs, css_hash, classes, styles, flags)}`);
     const close = (renderer, value, { head: head2, body: body2 }) => {
       if ("value" in attrs) {
@@ -328,7 +988,7 @@ class Renderer {
       if (value === this.local.select_value) {
         renderer.#out.push(" selected");
       }
-      renderer.#out.push(`>${body2}</option>`);
+      renderer.#out.push(`>${body2}${is_rich ? "<!>" : ""}</option>`);
       if (head2) {
         renderer.head((child) => child.push(head2));
       }
@@ -672,7 +1332,7 @@ class Renderer {
         has_promises = true;
         for (const p of v.promises) await p;
       }
-      entries.push(`[${JSON.stringify(k)},${v.serialized}]`);
+      entries.push(`[${uneval(k)},${v.serialized}]`);
     }
     let prelude = `const h = (window.__svelte ??= {}).h ??= new Map();`;
     if (has_promises) {
@@ -818,5 +1478,5 @@ function ensure_array_like(array_like_or_iterator) {
   return [];
 }
 
-export { ASYNC as A, BOUNDARY_EFFECT as B, COMMENT_NODE as C, DERIVED as D, ERROR_VALUE as E, bind_props as F, HYDRATION_START as H, INERT as I, LEGACY_PROPS as L, MAYBE_DIRTY as M, ROOT_EFFECT as R, STATE_SYMBOL as S, UNINITIALIZED as U, WAS_MARKED as W, HYDRATION_ERROR as a, DIRTY as b, CONNECTED as c, CLEAN as d, EFFECT as e, BLOCK_EFFECT as f, BRANCH_EFFECT as g, DESTROYED as h, is_passive_event as i, MANAGED_EFFECT as j, HEAD_EFFECT as k, REACTION_IS_UPDATING as l, EFFECT_RAN as m, EFFECT_PRESERVED as n, EFFECT_TRANSPARENT as o, EAGER_EFFECT as p, STALE_REACTION as q, render as r, HYDRATION_END as s, RENDER_EFFECT as t, HYDRATION_START_ELSE as u, USER_EFFECT as v, head as w, attr_class as x, stringify as y, ensure_array_like as z };
-//# sourceMappingURL=index-Co_WztV4.js.map
+export { ASYNC as A, BLOCK_EFFECT as B, CONNECTED as C, DevalueError as D, ERROR_VALUE as E, HYDRATION_END as F, HYDRATION_START_ELSE as G, HYDRATION_START as H, INERT as I, USER_EFFECT as J, uneval as K, LEGACY_PROPS as L, MAYBE_DIRTY as M, head as N, attr as O, attr_class as P, stringify as Q, ROOT_EFFECT as R, STATE_SYMBOL as S, ensure_array_like as T, UNINITIALIZED as U, bind_props as V, WAS_MARKED as W, is_plain_object as a, stringify_string as b, COMMENT_NODE as c, HYDRATION_ERROR as d, enumerable_symbols as e, DERIVED as f, get_type as g, DIRTY as h, is_primitive as i, CLEAN as j, EFFECT as k, is_passive_event as l, BRANCH_EFFECT as m, RENDER_EFFECT as n, MANAGED_EFFECT as o, DESTROYED as p, HEAD_EFFECT as q, render as r, stringify_key as s, REACTION_IS_UPDATING as t, EFFECT_RAN as u, EFFECT_PRESERVED as v, EFFECT_TRANSPARENT as w, BOUNDARY_EFFECT as x, EAGER_EFFECT as y, STALE_REACTION as z };
+//# sourceMappingURL=index-DEBH4Vt4.js.map

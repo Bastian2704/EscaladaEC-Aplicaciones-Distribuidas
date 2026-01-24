@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "start": "node build/index.js",
+    "start": "node -r dotenv/config build/index.js",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -32,8 +32,8 @@
     "@oslojs/encoding": "^1.1.0",
     "@playwright/test": "^1.49.1",
     "@sveltejs/adapter-node": "^5.4.0",
-    "@sveltejs/adapter-vercel": "^0.0.3",
-    "@sveltejs/kit": "^2.50.0",
+    "@sveltejs/adapter-vercel": "^6.1.1",
+    "@sveltejs/kit": "2.50.0",
     "@sveltejs/vite-plugin-svelte": "^6.0.0",
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/typography": "^0.5.15",
@@ -41,7 +41,7 @@
     "@types/node": "^22.18.8",
     "@types/pg": "^8.15.5",
     "@vitest/browser": "^3.2.3",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.30.2",
     "drizzle-orm": "^0.40.0",
     "eslint": "^9.22.0",
     "eslint-config-prettier": "^10.0.1",
@@ -69,7 +69,7 @@
     "lucia": "^3.2.2",
     "pg": "^8.16.3",
     "postgres": "^3.4.5",
-    "set-cookie-parser": "3.0.1"
+    "set-cookie-parser": "2.7.2"
   },
   "engines": {
     "node": "20.x"

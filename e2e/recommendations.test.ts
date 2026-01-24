@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('TP-UAT-REC - Pruebas de Usuario - Recomendaciones', () => {
-	// TP-UAT-REC-001
+	
 	test('TP-UAT-REC-001 - Ver recomendaciones en dashboard', async ({ page }) => {
 		await page.goto('/dashboard');
 		await expect(page.locator('text=Recomendaciones')).toBeVisible();
