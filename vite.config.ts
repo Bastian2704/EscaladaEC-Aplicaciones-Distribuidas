@@ -4,6 +4,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	resolve: {
+		alias: {
+			'set-cookie-parser': 'set-cookie-parser/lib/set-cookie.js'
+		}
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
